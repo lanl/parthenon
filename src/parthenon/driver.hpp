@@ -38,6 +38,7 @@ using ::parthenon::ApplyBoundaryConditions;
 using ::parthenon::Driver;
 using ::parthenon::DriverStatus;
 using ::parthenon::Integrator;
+using ::parthenon::IterationDriver;
 using ::parthenon::Mesh;
 using ::parthenon::MeshBlock;
 using ::parthenon::MultiStageBlockTaskDriver;

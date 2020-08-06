@@ -13,7 +13,9 @@
 
 #include "interface/container_collection.hpp"
 
+#include <algorithm>
 #include <string>
+#include <utility>
 
 namespace parthenon {
 
@@ -60,6 +62,19 @@ void ContainerCollection<T>::Add(const std::string &name,
   }
 
   containers_[name] = c;
+}
+
+template <typename T>
+std::shared_ptr<Container<T>> &ContainerCollection<T>::Get(const std::string &label) {
+  auto it = FindIterator(label);
+  return it->second;
+}
+
+template <typename T>
+void ContainerCollection<T>::Swap(const std::string &label1, const std::string &label2) {
+  auto it1 = FindIterator(label1);
+  auto it2 = FindIterator(label2);
+  std::swap(it1->second, it2->second);
 }
 
 template class ContainerCollection<Real>;
