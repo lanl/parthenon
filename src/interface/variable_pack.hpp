@@ -143,8 +143,9 @@ template <typename T>
 using MapToVariableFluxPack = std::map<vpack_types::StringPair, FluxPackIndxPair<T>>;
 
 template <typename T>
-void FillVarView(const vpack_types::VarList<T> &vars, PackIndexMap *vmap,
-                 ViewOfParArrays<T> &cv, ParArrayND<int> &sparse_assoc) {
+void FillVarView(const DevExecSpace exec_space, const vpack_types::VarList<T> &vars,
+                 PackIndexMap *vmap, ViewOfParArrays<T> &cv,
+                 ParArrayND<int> &sparse_assoc) {
   using vpack_types::IndexPair;
 
   auto host_view = cv.GetHostMirror();
@@ -195,14 +196,14 @@ void FillVarView(const vpack_types::VarList<T> &vars, PackIndexMap *vmap,
                                                    IndexPair(sparse_start, vindex - 1)));
   }
 
-  cv.DeepCopy(host_view);
-  sparse_assoc.DeepCopy(host_sp);
+  cv.DeepCopy(exec_space, host_view);
+  sparse_assoc.DeepCopy(exec_space, host_sp);
 }
 
 template <typename T>
-void FillFluxViews(const vpack_types::VarList<T> &vars, PackIndexMap *vmap,
-                   const int ndim, ViewOfParArrays<T> &f1, ViewOfParArrays<T> &f2,
-                   ViewOfParArrays<T> &f3) {
+void FillFluxViews(const DevExecSpace exec_space, const vpack_types::VarList<T> &vars,
+                   PackIndexMap *vmap, const int ndim, ViewOfParArrays<T> &f1,
+                   ViewOfParArrays<T> &f2, ViewOfParArrays<T> &f3) {
   using vpack_types::IndexPair;
 
   auto host_f1 = f1.GetHostMirror();
@@ -254,15 +255,15 @@ void FillFluxViews(const vpack_types::VarList<T> &vars, PackIndexMap *vmap,
                                                    IndexPair(sparse_start, vindex - 1)));
   }
 
-  f1.DeepCopy(host_f1);
-  f2.DeepCopy(host_f2);
-  f3.DeepCopy(host_f3);
+  f1.DeepCopy(exec_space, host_f1);
+  f2.DeepCopy(exec_space, host_f2);
+  f3.DeepCopy(exec_space, host_f3);
 }
 
 template <typename T>
-VariableFluxPack<T> MakeFluxPack(const vpack_types::VarList<T> &vars,
-                                 const vpack_types::VarList<T> &flux_vars,
-                                 PackIndexMap *vmap = nullptr) {
+VariableFluxPack<T>
+MakeFluxPack(const DevExecSpace exec_space, const vpack_types::VarList<T> &vars,
+             const vpack_types::VarList<T> &flux_vars, PackIndexMap *vmap = nullptr) {
   // count up the size
   int vsize = 0;
   for (const auto &v : vars) {
@@ -284,15 +285,16 @@ VariableFluxPack<T> MakeFluxPack(const vpack_types::VarList<T> &vars,
   ViewOfParArrays<T> f3("MakeFluxPack::f3", fsize);
   ParArrayND<int> sparse_assoc("MakeFluxPack::sparse_assoc", vsize);
   // add variables to host view
-  FillVarView(vars, vmap, cv, sparse_assoc);
+  FillVarView(exec_space, vars, vmap, cv, sparse_assoc);
   // add fluxes to host view
-  FillFluxViews(flux_vars, vmap, ndim, f1, f2, f3);
+  FillFluxViews(exec_space, flux_vars, vmap, ndim, f1, f2, f3);
 
   return VariableFluxPack<T>(cv, f1, f2, f3, sparse_assoc, cv_size, fsize);
 }
 
 template <typename T>
-VariablePack<T> MakePack(const vpack_types::VarList<T> &vars,
+VariablePack<T> MakePack(const DevExecSpace exec_space,
+                         const vpack_types::VarList<T> &vars,
                          PackIndexMap *vmap = nullptr) {
   // count up the size
   int vsize = 0;
@@ -304,7 +306,7 @@ VariablePack<T> MakePack(const vpack_types::VarList<T> &vars,
   ViewOfParArrays<T> cv("MakePack::cv", vsize);
   ParArrayND<int> sparse_assoc("MakeFluxPack::sparse_assoc", vsize);
 
-  FillVarView(vars, vmap, cv, sparse_assoc);
+  FillVarView(exec_space, vars, vmap, cv, sparse_assoc);
 
   auto fvar = vars.front()->data;
   std::array<int, 4> cv_size = {fvar.GetDim(1), fvar.GetDim(2), fvar.GetDim(3), vsize};

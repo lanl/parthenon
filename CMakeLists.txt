@@ -30,6 +30,8 @@ option(
 stop linting by default. You can still lint using the \"lint\" target"
   ON
 )
+option(PARTHENON_USE_LIGHTWEIGHT_HINT "Use Kokkos lightweight hint" OFF)
+
 option(
   PARTHENON_DISABLE_EXAMPLES 
   "Example drivers are built by default, set this to True to diable, note if regression tests are \

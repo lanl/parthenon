@@ -25,6 +25,7 @@ If you come across a disfunctional setup, please report it by open an issue or p
    | REGRESSION\_GOLD\_STANDARD\_HASH | SHA512=... | String | Hash value of gold standard file to be downloaded. Used to ensure that the download is not corrupted. |
    | REGRESSION\_GOLD\_STANDARD\_SYNC | ON    | Option | Create `gold_standard` target to download gold standard files |
    |          ENABLE\_UNIT\_TESTS | ${BUILD\_TESTING} | Option | Enable unit tests |
+   |PARTHENON\_USE\_LIGHTWEIGHT\_HINT | OFF | Option | Decorate default parallel region wrappers to be lightweight kernels |
    |               CODE\_COVERAGE | OFF      | Option | Builds with code coverage flags |
 
 ### NB: CMake options prefixed with *PARTHENON\_* modify behavior.

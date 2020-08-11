@@ -112,7 +112,13 @@ void BoundaryVariable::CopyVariableBufferSameProcess(NeighborBlock &nb, int ssiz
   MeshBlock *ptarget_block = pmy_mesh_->FindMeshBlock(nb.snb.gid);
   // 2) which element in vector of BoundaryVariable *?
   BoundaryData<> *ptarget_bdata = &(ptarget_block->pbval->bvars[bvar_index]->bd_var_);
-  ptarget_block->deep_copy(ptarget_bdata->recv[nb.targetid], bd_var_.send[nb.bufid]);
+  // TODO(pgrete) ensure/double check that the data on target has already been used before
+  // overwriting it
+  // using source block for deep copy to ensure physics kernels are done
+  MeshBlock *psource_block = pmy_block_;
+  psource_block->deep_copy(ptarget_bdata->recv[nb.targetid], bd_var_.send[nb.bufid]);
+  // need fence here as deep_copy is async
+  psource_block->exec_space.fence();
   // finally, set the BoundaryStatus flag on the destination buffer
   ptarget_bdata->flag[nb.targetid] = BoundaryStatus::arrived;
   return;
@@ -127,8 +133,12 @@ void BoundaryVariable::CopyFluxCorrectionBufferSameProcess(NeighborBlock &nb, in
   // 2) which element in vector of BoundaryVariable *?
   BoundaryData<> *ptarget_bdata =
       &(ptarget_block->pbval->bvars[bvar_index]->bd_var_flcor_);
-  ptarget_block->deep_copy(ptarget_bdata->recv[nb.targetid],
+  // using source block for deep copy to ensure physics kernels are done
+  MeshBlock *psource_block = pmy_block_;
+  psource_block->deep_copy(ptarget_bdata->recv[nb.targetid],
                            bd_var_flcor_.send[nb.bufid]);
+  // need fence here as deep_copy is async
+  psource_block->exec_space.fence();
   ptarget_bdata->flag[nb.targetid] = BoundaryStatus::arrived;
   return;
 }
@@ -152,13 +162,13 @@ void BoundaryVariable::SendBoundaryBuffers() {
       ssize = LoadBoundaryBufferToCoarser(bd_var_.send[nb.bufid], nb);
     else
       ssize = LoadBoundaryBufferToFiner(bd_var_.send[nb.bufid], nb);
-    // fence to make sure buffers are loaded and ready to send
-    pmb->exec_space.fence();
     if (nb.snb.rank == Globals::my_rank) {
       // on the same process
       CopyVariableBufferSameProcess(nb, ssize);
     } else {
 #ifdef MPI_PARALLEL
+      // fence to make sure buffers are loaded and ready to send
+      pmb->exec_space.fence();
       MPI_Start(&(bd_var_.req_send[nb.bufid]));
 #endif
     }

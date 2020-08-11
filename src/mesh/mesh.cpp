@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "kokkos_abstraction.hpp"
 #include "parthenon_mpi.hpp"
 
 #include "bvals/boundary_conditions.hpp"
@@ -47,6 +48,79 @@
 #include "utils/error_checking.hpp"
 
 namespace parthenon {
+
+void CheckThreadAndStreamConfig(int num_threads, int num_streams) {
+  std::stringstream msg;
+  // check number of OpenMP threads for mesh
+  if (num_threads < 1) {
+    msg << "### FATAL ERROR in Mesh constructor" << std::endl
+        << "Number of OpenMP threads must be >= 1, but num_threads=" << num_threads
+        << std::endl;
+    PARTHENON_FAIL(msg);
+  }
+
+#ifndef KOKKOS_ENABLE_OPENMP
+  if ((num_threads > 1) && (Globals::my_rank == 0)) {
+    std::cout << "### WARNING requesting to run with " << num_threads
+              << " host threads, but OpenMP backend is disabled." << std::endl
+              << " Consider setting Kokkos_ENABLE_OPENMP=True." << std::endl
+              << " The simulation will continue but only use a single thread."
+              << std::endl;
+  }
+#else
+  // Check if environment and parameter match. Otherwise warn user.
+  if (const char *env_omp_num_threads_str = std::getenv("OMP_NUM_THREADS")) {
+    int env_omp_num_threads = atoi(env_omp_num_threads_str);
+    if ((num_threads != env_omp_num_threads) && (Globals::my_rank == 0)) {
+      std::cout << "### WARNING requesting " << num_threads
+                << " thread(s) from parameter file or command line while "
+                << "environment variable OMP_NUM_THREADS is set to "
+                << env_omp_num_threads << "." << std::endl
+                << "The parameter variable will take precedence!" << std::endl;
+    }
+  }
+  if ((num_threads > 1) &&
+#if _OPENMP >= 201811
+      (omp_get_max_active_levels() <= 1)) {
+#else
+      (!omp_get_nested())) {
+#endif // _OPENMP
+    if (Globals::my_rank == 0) {
+      std::cout << "### WARNING requesting to run with " << num_threads
+                << " host threads, but OpenMP nested parallelism is not active."
+                << std::endl
+                << " Consider setting "
+                <<
+#if _OPENMP >= 201811
+          "OMP_MAX_ACTIVE_LEVELS=2"
+#else
+          "OMP_NESTED=TRUE"
+#endif // _OPENMP
+
+                << "." << std::endl
+                << " The simulation will continue but only use a single thread."
+                << std::endl;
+    }
+  }
+#endif // KOKKOS_ENABLE_OPENMP
+
+  // the following two error checks in combination with the driver task list logic
+  // in driver.hpp are a workaround to make scratch pad allocation work in a
+  // multi host thread environment
+  if (num_threads > num_streams) {
+    msg << "### FATAL ERROR in Mesh constructor" << std::endl
+        << "Number of threads (" << num_threads << ") must be <= num_streams ("
+        << num_streams << ")" << std::endl;
+    PARTHENON_FAIL(msg);
+  }
+
+  if (num_streams % num_threads != 0) {
+    msg << "### FATAL ERROR in Mesh constructor" << std::endl
+        << "Number of streams (" << num_streams << ") must be a multiple of num_threads ("
+        << num_threads << ")" << std::endl;
+    PARTHENON_FAIL(msg);
+  }
+}
 
 //----------------------------------------------------------------------------------------
 // Mesh constructor, builds mesh at start of calculation using parameters in input file
@@ -87,7 +161,11 @@ Mesh::Mesh(ParameterInput *pin, Properties_t &properties, Packages_t &packages,
       packages(packages),
       // private members:
       next_phys_id_(),
+      // TODO(future us) setting num_threads and num_streams default to 1 is a safe
+      // default options. At some point we should revisit if we can give the user
+      // a better sense of "performant" default depending on the simulation setup.
       num_mesh_threads_(pin->GetOrAddInteger("parthenon/mesh", "num_threads", 1)),
+      num_mesh_streams_(pin->GetOrAddInteger("parthenon/mesh", "num_streams", 1)),
       tree(this), use_uniform_meshgen_fn_{true, true, true, true},
       nuser_history_output_(), lb_flag_(true), lb_automatic_(),
       lb_manual_(), MeshGenerator_{nullptr, UniformMeshGeneratorX1,
@@ -109,12 +187,14 @@ Mesh::Mesh(ParameterInput *pin, Properties_t &properties, Packages_t &packages,
   ReserveMeshBlockPhysIDs();
 #endif
 
-  // check number of OpenMP threads for mesh
-  if (num_mesh_threads_ < 1) {
-    msg << "### FATAL ERROR in Mesh constructor" << std::endl
-        << "Number of OpenMP threads must be >= 1, but num_threads=" << num_mesh_threads_
-        << std::endl;
-    PARTHENON_FAIL(msg);
+  CheckThreadAndStreamConfig(num_mesh_threads_, num_mesh_streams_);
+
+  if (num_mesh_streams_ > 1) {
+    for (auto n = 0; n < num_mesh_streams_; n++) {
+      exec_spaces.push_back(parthenon::SpaceInstance<DevExecSpace>::create());
+    }
+  } else {
+    exec_spaces.push_back(DevExecSpace());
   }
 
   // check number of grid cells in root level of mesh from input file.
@@ -528,6 +608,7 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper &resfile, Properties_t &properties,
       // private members:
       next_phys_id_(),
       num_mesh_threads_(pin->GetOrAddInteger("parthenon/mesh", "num_threads", 1)),
+      num_mesh_streams_(pin->GetOrAddInteger("parthenon/mesh", "num_streams", 1)),
       tree(this), use_uniform_meshgen_fn_{true, true, true}, nreal_user_mesh_data_(),
       nint_user_mesh_data_(), nuser_history_output_(), lb_flag_(true), lb_automatic_(),
       lb_manual_(), MeshGenerator_{UniformMeshGeneratorX1, UniformMeshGeneratorX2,
@@ -550,12 +631,14 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper &resfile, Properties_t &properties,
   ReserveMeshBlockPhysIDs();
 #endif
 
-  // check the number of OpenMP threads for mesh
-  if (num_mesh_threads_ < 1) {
-    msg << "### FATAL ERROR in Mesh constructor" << std::endl
-        << "Number of OpenMP threads must be >= 1, but num_threads=" << num_mesh_threads_
-        << std::endl;
-    PARTHENON_FAIL(msg);
+  CheckThreadAndStreamConfig(num_mesh_threads_, num_mesh_streams_);
+
+  if(num_mesh_streams_> 1) {
+  for (auto n = 0; n < num_mesh_streams_; n++) {
+    exec_spaces.push_back(parthenon::SpaceInstance<DevExecSpace>::create());
+  }
+  } else {
+    exec_spaces.push_back(DevExecSpace());
   }
 
   // get the end of the header
@@ -846,6 +929,12 @@ Mesh::~Mesh() {
     delete[] user_history_func_;
     delete[] user_history_ops_;
   }
+  // only cleanup streams if some were actually created
+  if (num_mesh_streams_ > 1) {
+    for (auto n = 0; n < num_mesh_streams_; n++) {
+      SpaceInstance<DevExecSpace>::destroy(exec_spaces[n]);
+    }
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -1133,7 +1222,8 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
   bool iflag = true;
   int inb = nbtotal;
 #ifdef OPENMP_PARALLEL
-  int nthreads = GetNumMeshThreads();
+  // int nthreads = GetNumMeshThreads();
+  int nthreads = 1; // TODO(pgrete) check what's going wrong here. Disable for now.
 #endif
   int nmb = GetNumMeshBlocksThisRank(Globals::my_rank);
   std::vector<MeshBlock *> pmb_array(nmb);
@@ -1154,6 +1244,12 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
         MeshBlock *pmb = pmb_array[i];
         pmb->ProblemGenerator(pin);
       }
+    }
+    // assign exec space to MeshBlock
+    // TODO(pgrete) need to update exec spaces for AMR
+    for (int i = 0; i < nmb; ++i) {
+      MeshBlock *pmb = pmb_array[i];
+      pmb->exec_space = GetExecSpaceFromPool(i);
     }
 
     int call = 0;

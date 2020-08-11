@@ -22,6 +22,7 @@
 
 #include "basic_types.hpp"
 #include "globals.hpp"
+#include "kokkos_abstraction.hpp"
 #include "mesh/mesh.hpp"
 #include "outputs/outputs.hpp"
 #include "parameter_input.hpp"
@@ -35,7 +36,7 @@ enum class DriverStatus { complete, timeout, failed };
 
 class Driver {
  public:
-  Driver(ParameterInput *pin, Mesh *pm) : pinput(pin), pmesh(pm) {}
+  Driver(ParameterInput *pin, Mesh *pm) : pinput(pin), pmesh(pm), nmb_cycle() {}
   virtual DriverStatus Execute() = 0;
   void InitializeOutputs() { pouts = std::make_unique<Outputs>(pmesh, pinput); }
 
@@ -44,10 +45,8 @@ class Driver {
   std::unique_ptr<Outputs> pouts;
 
  protected:
-  clock_t tstart_;
-#ifdef OPENMP_PARALLEL
-  double omp_start_time_;
-#endif
+  Kokkos::Timer timer_cycle, timer_main;
+  std::uint64_t nmb_cycle;
   virtual void PreExecute();
   virtual void PostExecute();
 
@@ -83,25 +82,55 @@ namespace DriverUtils {
 
 template <typename T, class... Args>
 TaskListStatus ConstructAndExecuteBlockTasks(T *driver, Args... args) {
+#ifdef OPENMP_PARALLEL
+  int nthreads = driver->pmesh->GetNumMeshThreads();
+#endif
   int nmb = driver->pmesh->GetNumMeshBlocksThisRank(Globals::my_rank);
   std::vector<TaskList> task_lists;
   MeshBlock *pmb = driver->pmesh->pblock;
+  int i = 0;
   while (pmb != nullptr) {
     task_lists.push_back(driver->MakeTaskList(pmb, std::forward<Args>(args)...));
+    // reassigning ExecSpaces to account for changing MeshBlocks due to, e.g.,
+    // loadbalance or AMR
+    pmb->exec_space = driver->pmesh->GetExecSpaceFromPool(i);
     pmb = pmb->next;
+    i += 1;
   }
   int complete_cnt = 0;
-  while (complete_cnt != nmb) {
-    // TODO(pgrete): need to let Kokkos::PartitionManager handle this
-    for (auto i = 0; i < nmb; ++i) {
-      if (!task_lists[i].IsComplete()) {
-        auto status = task_lists[i].DoAvailable();
-        if (status == TaskListStatus::complete) {
-          complete_cnt++;
+  Kokkos::View<int *, HostMemSpace> mb_locks("mb_locks", nmb);
+  auto f = [&](int thread_id, int num_threads) {
+    while (complete_cnt != nmb) {
+      for (auto i = 0; i < nmb; ++i) {
+        // Workaround to ensure that the same thread works on the same MeshBlocks within
+        // a cycle. Trying to circumvent problem in setting scratch pad memory, which is
+        // not thread safe.
+        if (i % num_threads != thread_id) {
+          continue;
+        }
+        // try to obtain lock by changing val from 0 to 1
+        if (Kokkos::atomic_compare_exchange_strong(&mb_locks(i), 0, 1)) {
+          if (!task_lists[i].IsComplete()) {
+            auto status = task_lists[i].DoAvailable();
+            if (status == TaskListStatus::complete) {
+              // no reset of the lock here so that no other thread may increment the cnt
+              Kokkos::atomic_increment(&complete_cnt);
+            }
+          }
+          Kokkos::atomic_decrement(&mb_locks(i));
         }
       }
     }
-  }
+  };
+
+#ifdef KOKKOS_ENABLE_OPENMP
+  // using a fixed number of partitions (= nthreads) with each partition of size 1,
+  // i.e., one thread per partition and this thread is the master thread
+  Kokkos::OpenMP::partition_master(f, nthreads, 1);
+#else
+  f(0, 1);
+#endif
+
   return TaskListStatus::complete;
 }
 
