@@ -20,6 +20,8 @@ if( "pi-example" IN_LIST DRIVER_LIST OR NOT PARTHENON_DISABLE_EXAMPLES)
           pi_driver.cpp
           pi_driver.hpp
   )
-  target_link_libraries(pi-example PRIVATE parthenon)
-  lint_target(pi-example)
+  target_link_libraries(pi-example PRIVATE Parthenon::parthenon)
+  if( CMAKE_SOURCE_DIR STREQUAL parthenon_SOURCE_DIR)
+    lint_target(pi-example)
+  endif()
 endif()

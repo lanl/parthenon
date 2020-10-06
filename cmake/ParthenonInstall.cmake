@@ -11,16 +11,23 @@
 # the public, perform publicly and display publicly, and to permit others to do so.
 #=========================================================================================
 
-get_property(LIST_OF_TESTS GLOBAL PROPERTY DRIVER_LIST)
-if( "pi-example" IN_LIST DRIVER_LIST OR NOT PARTHENON_DISABLE_EXAMPLES)
-  add_executable(
-      face-fields-example
-          face_fields_example.cpp
-          face_fields_example.hpp
-          face_fields_main.cpp
-  )
-  target_link_libraries(face-fields-example PRIVATE Parthenon::parthenon)
-  if( CMAKE_SOURCE_DIR STREQUAL parthenon_SOURCE_DIR)
-    lint_target(face-fields-example)
-  endif()
-endif()
+include_guard(GLOBAL)
+
+install(TARGETS parthenon EXPORT parthenonTargets
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    )
+
+
+# Install generated config header file
+install(FILES ${parthenon_BINARY_DIR}/include/parthenon/generated/config.hpp
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+install(FILES ${parthenon_BINARY_DIR}/cmake/parthenonConfig.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/parthenon")
+
+install(EXPORT parthenonTargets
+    FILE parthenonTargets.cmake
+    NAMESPACE Parthenon::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/parthenon"
+    )

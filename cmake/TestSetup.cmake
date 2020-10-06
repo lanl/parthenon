@@ -11,7 +11,7 @@
 # the public, perform publicly and display publicly, and to permit others to do so.
 #=========================================================================================
 
-
+include_guard(GLOBAL)
 
 # Search for the python interpreter
 # Version number has been intentionally excluded from find_package call, so that latest version 
@@ -23,7 +23,7 @@ if( ${Python3_VERSION} VERSION_LESS "3.5")
 endif()
 
 # Ensure all required packages are present
-include(${PROJECT_SOURCE_DIR}/cmake/PythonModuleCheck.cmake)
+include(${parthenon_SOURCE_DIR}/cmake/PythonModuleCheck.cmake)
 required_python_modules_found("${REQUIRED_PYTHON_MODULES}")
 
 # Adds the drivers used in the regression tests to a global cmake property: DRIVERS_USED_IN_TESTS
@@ -48,7 +48,7 @@ function(setup_test dir arg)
   separate_arguments(arg) 
   add_test( NAME regression_test:${dir} COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/run_test.py" 
     ${arg} --test_dir "${CMAKE_CURRENT_SOURCE_DIR}/test_suites/${dir}"
-    --output_dir "${PROJECT_BINARY_DIR}/tst/regression/outputs/${dir}")
+    --output_dir "${parthenon_BINARY_DIR}/tst/regression/outputs/${dir}")
   set_tests_properties(regression_test:${dir} PROPERTIES LABELS "regression;mpi-no" )
   record_driver("${arg}")
 endfunction()
@@ -63,7 +63,7 @@ function(setup_test_coverage dir arg)
       ${arg} 
       --coverage
       --test_dir "${CMAKE_CURRENT_SOURCE_DIR}/test_suites/${dir}"
-      --output_dir "${PROJECT_BINARY_DIR}/tst/regression/outputs/${dir}_cov")
+      --output_dir "${parthenon_BINARY_DIR}/tst/regression/outputs/${dir}_cov")
     set_tests_properties(regression_coverage_test:${dir} PROPERTIES LABELS "regression;coverage;mpi-no" )
     record_driver("${arg}")
   endif()
@@ -105,7 +105,7 @@ function(setup_test_mpi nproc dir arg)
     add_test( NAME regression_mpi_test:${dir} COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_test.py
       ${MPIARGS} ${arg}
       --test_dir ${CMAKE_CURRENT_SOURCE_DIR}/test_suites/${dir}
-      --output_dir "${PROJECT_BINARY_DIR}/tst/regression/outputs/${dir}_mpi")
+      --output_dir "${parthenon_BINARY_DIR}/tst/regression/outputs/${dir}_mpi")
     set_tests_properties(regression_mpi_test:${dir} PROPERTIES LABELS "regression;mpi-yes" RUN_SERIAL ON )
     record_driver("${arg}")
   else()
@@ -125,7 +125,7 @@ function(setup_test_mpi_coverage nproc dir arg)
         --coverage
         ${MPIARGS} ${arg}
         --test_dir ${CMAKE_CURRENT_SOURCE_DIR}/test_suites/${dir}
-        --output_dir "${PROJECT_BINARY_DIR}/tst/regression/outputs/${dir}_mpi_cov"
+        --output_dir "${parthenon_BINARY_DIR}/tst/regression/outputs/${dir}_mpi_cov"
         )
       set_tests_properties(regression_mpi_coverage_test:${dir} PROPERTIES LABELS "regression;coverage;mpi-yes" RUN_SERIAL ON )
     endif()
