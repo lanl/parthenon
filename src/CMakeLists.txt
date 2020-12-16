@@ -213,6 +213,7 @@ add_library(parthenon
   utils/buffer_utils.cpp
   utils/buffer_utils.hpp
   utils/change_rundir.cpp
+  utils/dict_anytype.hpp
   utils/error_checking.hpp
   utils/error_checking.cpp
   utils/partition_stl_containers.hpp

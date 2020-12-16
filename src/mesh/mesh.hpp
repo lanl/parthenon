@@ -105,6 +105,10 @@ class Mesh {
   Properties_t properties;
   Packages_t packages;
 
+  // user data
+  DictAnyType user_data;
+
+  // MeshData
   DataCollection<MeshData<Real>> mesh_data;
 
   // functions
