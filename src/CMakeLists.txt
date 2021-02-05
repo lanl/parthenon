@@ -1,6 +1,5 @@
-
 #=========================================================================================
-# (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+# (C) (or copyright) 2020-2021. Triad National Security, LLC. All rights reserved.
 #
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -158,6 +157,7 @@ add_library(parthenon
   interface/state_descriptor.cpp
   interface/update.cpp
   interface/update.hpp
+  interface/variable_pack.cpp
   interface/variable_pack.hpp
   interface/variable.cpp
   interface/variable.hpp
@@ -234,6 +234,7 @@ add_library(parthenon
   parthenon_manager.cpp
   parthenon_manager.hpp
   parthenon_mpi.hpp
+  parthenon_arrays.cpp
 )
 add_library(Parthenon::parthenon ALIAS parthenon)
 
