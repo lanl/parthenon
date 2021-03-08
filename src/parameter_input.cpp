@@ -455,6 +455,13 @@ InputBlock *ParameterInput::GetPtrToBlock(const std::string &name) {
   return nullptr;
 }
 
+const InputBlock *ParameterInput::GetPtrToBlock(const std::string &name) const {
+  InputBlock *pb;
+  for (pb = pfirst_block; pb != nullptr; pb = pb->pnext) {
+    if (name.compare(pb->block_name) == 0) return pb;
+  }
+  return nullptr;
+}
 //----------------------------------------------------------------------------------------
 //! \fn int ParameterInput::DoesParameterExist(const std::string & block, const
 //! std::string & name)
@@ -515,7 +522,7 @@ std::string ParameterInput::GetComment(const std::string &block,
 //! name)
 //  \brief returns integer value of string stored in block/name
 
-int ParameterInput::GetInteger(const std::string &block, const std::string &name) {
+/*int ParameterInput::GetInteger(const std::string &block, const std::string &name) {
   InputBlock *pb;
   InputLine *pl;
   std::stringstream msg;
@@ -544,13 +551,13 @@ int ParameterInput::GetInteger(const std::string &block, const std::string &name
 
   // Convert string to integer and return value
   return stoi(val);
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn Real ParameterInput::GetReal(const std::string & block, const std::string & name)
 //  \brief returns real value of string stored in block/name
 
-Real ParameterInput::GetReal(const std::string &block, const std::string &name) {
+/*Real ParameterInput::GetReal(const std::string &block, const std::string &name) {
   InputBlock *pb;
   InputLine *pl;
   std::stringstream msg;
@@ -579,14 +586,14 @@ Real ParameterInput::GetReal(const std::string &block, const std::string &name) 
 
   // Convert string to real and return value
   return static_cast<Real>(atof(val.c_str()));
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn bool ParameterInput::GetBoolean(const std::string & block, const std::string &
 //! name)
 //  \brief returns boolean value of string stored in block/name
 
-bool ParameterInput::GetBoolean(const std::string &block, const std::string &name) {
+/*bool ParameterInput::GetBoolean(const std::string &block, const std::string &name) {
   InputBlock *pb;
   InputLine *pl;
   std::stringstream msg;
@@ -626,14 +633,14 @@ bool ParameterInput::GetBoolean(const std::string &block, const std::string &nam
   is >> std::boolalpha >> b;
 
   return (b);
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn std::string ParameterInput::GetString(const std::string & block, const std::string
 //! & name)
 //  \brief returns string stored in block/name
 
-std::string ParameterInput::GetString(const std::string &block, const std::string &name) {
+/*std::string ParameterInput::GetString(const std::string &block, const std::string &name) {
   InputBlock *pb;
   InputLine *pl;
   std::stringstream msg;
@@ -662,7 +669,7 @@ std::string ParameterInput::GetString(const std::string &block, const std::strin
 
   // return value
   return val;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn int ParameterInput::GetOrAddInteger(const std::string & block, const std::string &
@@ -670,7 +677,7 @@ std::string ParameterInput::GetString(const std::string &block, const std::strin
 //    int default_value)
 //  \brief returns integer value stored in block/name if it exists, or creates and sets
 //  value to def_value if it does not exist
-
+/*
 int ParameterInput::GetOrAddInteger(const std::string &block, const std::string &name,
                                     int def_value) {
   InputBlock *pb;
@@ -692,7 +699,7 @@ int ParameterInput::GetOrAddInteger(const std::string &block, const std::string 
   }
   Unlock();
   return ret;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn Real ParameterInput::GetOrAddReal(const std::string & block, const std::string &
@@ -700,7 +707,7 @@ int ParameterInput::GetOrAddInteger(const std::string &block, const std::string 
 //    Real def_value)
 //  \brief returns real value stored in block/name if it exists, or creates and sets
 //  value to def_value if it does not exist
-
+/*
 Real ParameterInput::GetOrAddReal(const std::string &block, const std::string &name,
                                   Real def_value) {
   InputBlock *pb;
@@ -722,7 +729,7 @@ Real ParameterInput::GetOrAddReal(const std::string &block, const std::string &n
   }
   Unlock();
   return ret;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn Real ParameterInput::GetOrAddPrecise(const std::string & block, const std::string
@@ -730,7 +737,7 @@ Real ParameterInput::GetOrAddReal(const std::string &block, const std::string &n
 //    Real def_value)
 //  \brief returns real value stored in block/name if it exists, or creates and sets
 //  value to def_value if it does not exist.  Value is read with full precision.
-
+/*
 Real ParameterInput::GetOrAddPrecise(const std::string &block, const std::string &name,
                                      Real def_value) {
   InputBlock *pb;
@@ -749,7 +756,7 @@ Real ParameterInput::GetOrAddPrecise(const std::string &block, const std::string
     ret = SetPrecise(block, name, def_value);
   }
   return ret;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn bool ParameterInput::GetOrAddBoolean(const std::string & block, const std::string
@@ -757,7 +764,7 @@ Real ParameterInput::GetOrAddPrecise(const std::string &block, const std::string
 //    bool def_value)
 //  \brief returns boolean value stored in block/name if it exists, or creates and sets
 //  value to def_value if it does not exist
-
+/*
 bool ParameterInput::GetOrAddBoolean(const std::string &block, const std::string &name,
                                      bool def_value) {
   InputBlock *pb;
@@ -785,7 +792,7 @@ bool ParameterInput::GetOrAddBoolean(const std::string &block, const std::string
   }
   Unlock();
   return ret;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn std::string ParameterInput::GetOrAddString(const std::string & block, const
@@ -821,7 +828,7 @@ std::string ParameterInput::GetOrAddString(const std::string &block,
 //! name, int value)
 //  \brief updates an integer parameter; creates it if it does not exist
 
-int ParameterInput::SetInteger(const std::string &block, const std::string &name,
+/*int ParameterInput::SetInteger(const std::string &block, const std::string &name,
                                int value) {
   InputBlock *pb;
   std::stringstream ss_value;
@@ -832,14 +839,14 @@ int ParameterInput::SetInteger(const std::string &block, const std::string &name
   AddParameter(pb, name, ss_value.str(), "# Updated during run time");
   Unlock();
   return value;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn Real ParameterInput::SetReal(const std::string & block, const std::string & name,
 //! Real value)
 //  \brief updates a real parameter; creates it if it does not exist
 
-Real ParameterInput::SetReal(const std::string &block, const std::string &name,
+/*Real ParameterInput::SetReal(const std::string &block, const std::string &name,
                              Real value) {
   InputBlock *pb;
   std::stringstream ss_value;
@@ -850,14 +857,14 @@ Real ParameterInput::SetReal(const std::string &block, const std::string &name,
   AddParameter(pb, name, ss_value.str(), "# Updated during run time");
   Unlock();
   return value;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn Real ParameterInput::SetPrecise(const std::string & block, const std::string &
 //! name, Real value)
 //  \brief updates a real parameter with full precision; creates it if it does not exist
 
-Real ParameterInput::SetPrecise(const std::string &block, const std::string &name,
+/*Real ParameterInput::SetPrecise(const std::string &block, const std::string &name,
                                 Real value) {
   InputBlock *pb;
   std::stringstream ss_value;
@@ -869,14 +876,14 @@ Real ParameterInput::SetPrecise(const std::string &block, const std::string &nam
   AddParameter(pb, name, ss_value.str(), "# Updated during run time");
   Unlock();
   return value;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn bool ParameterInput::SetBoolean(const std::string & block, const std::string &
 //! name, bool value)
 //  \brief updates a boolean parameter; creates it if it does not exist
 
-bool ParameterInput::SetBoolean(const std::string &block, const std::string &name,
+/*bool ParameterInput::SetBoolean(const std::string &block, const std::string &name,
                                 bool value) {
   InputBlock *pb;
   std::stringstream ss_value;
@@ -887,7 +894,7 @@ bool ParameterInput::SetBoolean(const std::string &block, const std::string &nam
   AddParameter(pb, name, ss_value.str(), "# Updated during run time");
   Unlock();
   return value;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn std::string ParameterInput::SetString(const std::string & block, const std::string
@@ -895,7 +902,7 @@ bool ParameterInput::SetBoolean(const std::string &block, const std::string &nam
 //                                            std::string  value)
 //  \brief updates a string parameter; creates it if it does not exist
 
-std::string ParameterInput::SetString(const std::string &block, const std::string &name,
+/*std::string ParameterInput::SetString(const std::string &block, const std::string &name,
                                       const std::string &value) {
   InputBlock *pb;
 
@@ -904,7 +911,7 @@ std::string ParameterInput::SetString(const std::string &block, const std::strin
   AddParameter(pb, name, value, "# Updated during run time");
   Unlock();
   return value;
-}
+}*/
 
 //----------------------------------------------------------------------------------------
 //! \fn void ParameterInput::RollbackNextTime()
@@ -1018,7 +1025,9 @@ void ParameterInput::CheckDesired(const std::string &block, const std::string &n
   if (defaulted) {
     std::cout << std::endl
               << "Defaulting to <" << block << ">/" << name << " = "
-              << GetString(block, name) << std::endl;
+              << Get<std::string>(block, name) << std::endl;
+   //           << GetString(block, name) << std::endl;
+    
   }
 }
 
@@ -1063,11 +1072,16 @@ InputLine *InputBlock::GetPtrToLine(std::string name) {
   }
   return nullptr;
 }
-
+const InputLine *InputBlock::GetPtrToLine(std::string name) const {
+  for (InputLine *pl = pline; pl != nullptr; pl = pl->pnext) {
+    if (name.compare(pl->param_name) == 0) return pl;
+  }
+  return nullptr;
+}
 //----------------------------------------------------------------------------------------
 //! \fn void ParameterInput::Lock()
 //  \brief Lock ParameterInput for reading and writing
-void ParameterInput::Lock() {
+void ParameterInput::Lock() const {
 #ifdef OPENMP_PARALLEL
   omp_set_lock(&lock_);
 #endif
@@ -1077,7 +1091,7 @@ void ParameterInput::Lock() {
 //----------------------------------------------------------------------------------------
 //! \fn void ParameterInput::Unlock()
 //  \brief Unlock ParameterInput for reading and writing
-void ParameterInput::Unlock() {
+void ParameterInput::Unlock() const {
 #ifdef OPENMP_PARALLEL
   omp_unset_lock(&lock_);
 #endif
