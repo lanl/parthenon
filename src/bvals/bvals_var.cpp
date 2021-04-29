@@ -3,7 +3,7 @@
 // Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
 // Licensed under the 3-clause BSD License, see LICENSE file for details
 //========================================================================================
-// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2020-2021. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -202,6 +202,8 @@ bool BoundaryVariable::ReceiveBoundaryBuffers() {
 #ifdef MPI_PARALLEL
       else { // NOLINT // MPI boundary
         int test;
+        // probe MPI communications. This is a bit of black magic that seems to promote
+        // communications to top of stack on some supercomputers (e.g. BG/Q)
         PARTHENON_MPI_CHECK(MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &test,
                                        MPI_STATUS_IGNORE));
         PARTHENON_MPI_CHECK(
