@@ -3,7 +3,7 @@
 #  Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
 #  Licensed under the 3-clause BSD License, see LICENSE file for details
 # ========================================================================================
-#  (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2020-2021. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -16,48 +16,60 @@
 # ========================================================================================
 
 <parthenon/job>
-problem_id = pi_calculator
+problem_id = advection
 
 <parthenon/mesh>
 refinement = adaptive
-numlevel = 5
+numlevel = 3
 
 nx1 = 64
-x1min = -2.0
-x1max = 2.0
-ix1_bc = outflow
-ox1_bc = outflow
+x1min = -1.0
+x1max = 1.0
+ix1_bc = periodic
+ox1_bc = periodic
 
 nx2 = 64
-x2min = -2.0
-x2max = 2.0
-ix2_bc = outflow
-ox2_bc = outflow
+x2min = -1.0
+x2max = 1.0
+ix2_bc = periodic
+ox2_bc = periodic
 
 nx3 = 1
-x3min = -0.5
-x3max = 0.5
-
-# How many meshblocks to use in a premade default kernel.
-# A value of <1 means use the whole mesh.
-pack_size = 4
+x3min = -1.0
+x3max = 1.0
+ix3_bc = periodic
+ox3_bc = periodic
 
 <parthenon/meshblock>
 nx1 = 8
 nx2 = 8
 nx3 = 1
 
-<parthenon/refinement0>
-field = in_or_out               # the name of the variable we want to refine on
-method = derivative_order_1     # selects the first derivative method
-refine_tol = 0.5                # tag for refinement if |(dfield/dx)/field| > refine_tol
-derefine_tol = 0.05             # tag for derefinement if |(dfield/dx)/field| < derefine_tol
-max_level = 2                   # if set, limits refinement level from this criteria to no greater than max_level
+<parthenon/time>
+nlim = -1
+tlim = 1.0
+integrator = rk2
+ncycle_out_mesh = -10000
 
-<Pi>
-radius = 1.5
-use_sparse = 0 # Set to 1 to use sparse variables
+<SparseAdvection>
+cfl = 0.45
+speed = 1.0
+
+refine_tol = 0.3    # control the package specific refinement tagging function
+derefine_tol = 0.03
+
+<parthenon/output1>
+file_type = rst
+dt = 0.05
 
 <parthenon/output0>
 file_type = hdf5
-variables = in_or_out
+dt = 0.05
+variables = advected, advected_1, & # comments are ok
+            one_minus_advected, &
+            one_minus_advected_sq, & # on every (& characters are ok in comments)
+            one_minus_sqrt_one_minus_advected_sq # line
+
+<parthenon/output3>
+file_type = hst
+dt = 0.05
