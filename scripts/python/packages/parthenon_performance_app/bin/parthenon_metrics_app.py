@@ -15,7 +15,7 @@
 import argparse
 import os
 import datetime
-import parthenon_performance_app.githubapp
+from py_cgad.githubapp import GitHubApp
 from parthenon_performance_app.parthenon_performance_advection_analyzer import (
     AdvectionAnalyser,
 )
@@ -24,7 +24,7 @@ from parthenon_performance_app.parthenon_performance_json_parser import (
 )
 
 
-class ParthenonApp(parthenon_performance_app.githubapp.GitHubApp):
+class ParthenonApp(GitHubApp):
     """
     Parthenon App Class
 
@@ -296,11 +296,11 @@ def main(**kwargs):
 
     app = ParthenonApp()
     app.initialize(
-        kwargs["wiki"],
-        kwargs["ignore"],
-        kwargs["permissions"],
-        kwargs["create"],
-        getValue(kwargs, "repository_path"),
+        use_wiki=kwargs["wiki"],
+        ignore=kwargs["ignore"],
+        pem_file=kwargs["permissions"],
+        create_branch=kwargs["create"],
+        path_to_repo=getValue(kwargs, "repository_path"),
     )
 
     branch = getValue(kwargs, "branch")
@@ -352,7 +352,7 @@ if __name__ == "__main__":
         "the application. If not provided will use the env variable PARTHENON_METRICS_APP_PEM."
     )
 
-    parser.add_argument("--permissions", "-p", default="", type=str, nargs=1, help=desc)
+    parser.add_argument("--permissions", "-p", default=None, type=str, nargs=1, help=desc)
 
     desc = (
         "Path to the repository that will be analized, by default will check to see if a "
