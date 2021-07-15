@@ -35,14 +35,21 @@
 #include "metadata.hpp"
 #include "parthenon_arrays.hpp"
 #include "parthenon_mpi.hpp"
+#include "swarm_boundaries.hpp"
+#include "swarm_device_context.hpp"
 #include "variable.hpp"
 #include "variable_pack.hpp"
 
 namespace parthenon {
+
+struct ParticleBoundaries {
+  ParticleBound *bounds[6];
+};
+
 class MeshBlock;
 
 enum class PARTICLE_STATUS { UNALLOCATED, ALIVE, DEAD };
-
+/*
 class SwarmDeviceContext {
  public:
   KOKKOS_FUNCTION
@@ -87,7 +94,11 @@ class SwarmDeviceContext {
   KOKKOS_INLINE_FUNCTION
   int GetMyRank() const { return my_rank_; }
 
+<<<<<<< HEAD
+// private:
+=======
  private:
+>>>>>>> upstream/develop
   Real x_min_;
   Real x_max_;
   Real y_min_;
@@ -109,6 +120,42 @@ class SwarmDeviceContext {
   constexpr static int this_block_ = -1; // Mirrors definition in Swarm class
   int my_rank_;
 };
+*/
+
+//} // namespace parthenon
+
+//#include "swarm_boundaries.hpp"
+
+// namespace parthenon {
+
+/*
+class ParticleBoundIX1Periodic : ParticleBound {
+ public:
+  KOKKOS_INLINE_FUNCTION void Apply(const int n, double &x, double &y, double &z,
+                                        const SwarmDeviceContext &swarm_d) override {
+    if (x < swarm_d.x_min_global_) {
+      x = swarm_d.x_max_global_ - (swarm_d.x_min_global_ - x);
+    }
+  }
+};
+
+class ParticleBoundIX1Outflow : ParticleBound {
+ public:
+  KOKKOS_INLINE_FUNCTION void Apply(const int n, double &x, double &y, double &z,
+                                        const SwarmDeviceContext &swarm_d) override {
+    swarm_d.MarkParticleForRemoval(n);
+  }
+};
+
+class ParticleBoundIX1Reflect : ParticleBound {
+ public:
+  KOKKOS_INLINE_FUNCTION void Apply(const int n, double &x, double &y, double &z,
+                                        const SwarmDeviceContext &swarm_d) override {
+    if (x < swarm_d.x_min_global_) {
+      x = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x);
+    }
+  }
+};*/
 
 class Swarm {
  private:
@@ -126,6 +173,8 @@ class Swarm {
  public:
   Swarm(const std::string &label, const Metadata &metadata, const int nmax_pool_in = 3);
 
+  ~Swarm() = default;
+
   /// Returns shared pointer to a block
   std::shared_ptr<MeshBlock> GetBlockPointer() const {
     if (pmy_block.expired()) {
@@ -135,6 +184,8 @@ class Swarm {
   }
 
   SwarmDeviceContext GetDeviceContext() const;
+
+  void AllocateBoundaries();
 
   // Set the pointer to the mesh block for this swarm
   void SetBlockPointer(std::weak_ptr<MeshBlock> pmb) { pmy_block = pmb; }
@@ -155,6 +206,14 @@ class Swarm {
 
   /// Remote a variable from swarm
   void Remove(const std::string &label);
+
+  /// Set a custom boundary condition
+  void SetBoundary(
+      const int n,
+      std::unique_ptr<ParticleBound, parthenon::DeviceDeleter<Kokkos::HostSpace>> bc) {
+    bounds[n] = std::move(bc);
+    pbounds.bounds[n] = bounds[n].get();
+  }
 
   /// Get particle variable
   template <class T>
@@ -236,12 +295,18 @@ class Swarm {
   int num_particles_sent_;
   bool finished_transport;
 
+  // Class to store raw pointers to boundary conditions on device. Copy locally for
+  // compute kernel capture.
+  ParticleBoundaries pbounds;
+
   void LoadBuffers_(const int max_indices_size);
   void UnloadBuffers_();
 
  private:
   template <class T>
   vpack_types::SwarmVarList<T> MakeVarListAll_();
+
+  std::unique_ptr<ParticleBound, DeviceDeleter<Kokkos::HostSpace>> bounds[6];
 
   void SetNeighborIndices1D_();
   void SetNeighborIndices2D_();
@@ -254,6 +319,8 @@ class Swarm {
 
   int debug = 0;
   std::weak_ptr<MeshBlock> pmy_block;
+
+  void ApplyBoundaries_(const int nparticles, ParArrayND<int> indices);
 
   int nmax_pool_;
   int max_active_index_ = 0;

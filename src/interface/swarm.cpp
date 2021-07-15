@@ -19,6 +19,9 @@
 #include "mesh/mesh.hpp"
 #include "swarm.hpp"
 
+using Kokkos::kokkos_malloc;
+using Kokkos::parallel_for;
+
 namespace parthenon {
 
 SwarmDeviceContext Swarm::GetDeviceContext() const {
@@ -35,6 +38,12 @@ SwarmDeviceContext Swarm::GetDeviceContext() const {
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  context.ib_s_ = ib.s;
+  context.jb_s_ = jb.s;
+  context.kb_s_ = kb.s;
+  context.dx1_ = (pmb->coords.x1f(ib.e + 1) - pmb->coords.x1f(ib.s)) / (ib.e - ib.s + 1);
+  context.dx2_ = (pmb->coords.x2f(jb.e + 1) - pmb->coords.x2f(jb.s)) / (jb.e - jb.s + 1);
+  context.dx3_ = (pmb->coords.x3f(kb.e + 1) - pmb->coords.x3f(kb.s)) / (kb.e - kb.s + 1);
   context.x_min_ = pmb->coords.x1f(ib.s);
   context.y_min_ = pmb->coords.x2f(jb.s);
   context.z_min_ = pmb->coords.x3f(kb.s);
@@ -78,6 +87,85 @@ Swarm::Swarm(const std::string &label, const Metadata &metadata, const int nmax_
   marked_for_removal_.data.DeepCopy(marked_for_removal_h);
 }
 
+void Swarm::AllocateBoundaries() {
+  auto pmb = GetBlockPointer();
+  std::stringstream msg;
+
+  auto &bcs = pmb->pmy_mesh->mesh_bcs;
+
+  if (bcs[0] == BoundaryFlag::reflect) {
+    bounds[0] = DeviceAllocate<ParticleBoundIX1Reflect>();
+  } else if (bcs[0] == BoundaryFlag::outflow) {
+    bounds[0] = DeviceAllocate<ParticleBoundIX1Outflow>();
+  } else if (bcs[0] == BoundaryFlag::periodic) {
+    bounds[0] = DeviceAllocate<ParticleBoundIX1Periodic>();
+  } else if (bcs[0] != BoundaryFlag::user) {
+    msg << "ix1 boundary flag " << static_cast<int>(bcs[0]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  if (bcs[1] == BoundaryFlag::reflect) {
+    bounds[1] == DeviceAllocate<ParticleBoundOX1Reflect>();
+  } else if (bcs[1] == BoundaryFlag::outflow) {
+    bounds[1] = DeviceAllocate<ParticleBoundOX1Outflow>();
+  } else if (bcs[1] == BoundaryFlag::periodic) {
+    bounds[1] = DeviceAllocate<ParticleBoundOX1Periodic>();
+  } else if (bcs[1] != BoundaryFlag::user) {
+    msg << "ox1 boundary flag " << static_cast<int>(bcs[1]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  if (bcs[2] == BoundaryFlag::reflect) {
+    bounds[2] = DeviceAllocate<ParticleBoundIX2Reflect>();
+  } else if (bcs[2] == BoundaryFlag::outflow) {
+    bounds[2] = DeviceAllocate<ParticleBoundIX2Outflow>();
+  } else if (bcs[2] == BoundaryFlag::periodic) {
+    bounds[2] = DeviceAllocate<ParticleBoundIX2Periodic>();
+  } else if (bcs[2] != BoundaryFlag::user) {
+    msg << "ix2 boundary flag " << static_cast<int>(bcs[2]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  if (bcs[3] == BoundaryFlag::reflect) {
+    bounds[3] == DeviceAllocate<ParticleBoundOX2Reflect>();
+  } else if (bcs[3] == BoundaryFlag::outflow) {
+    bounds[3] = DeviceAllocate<ParticleBoundOX2Outflow>();
+  } else if (bcs[3] == BoundaryFlag::periodic) {
+    bounds[3] = DeviceAllocate<ParticleBoundOX2Periodic>();
+  } else if (bcs[3] != BoundaryFlag::user) {
+    msg << "ox2 boundary flag " << static_cast<int>(bcs[3]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  if (bcs[4] == BoundaryFlag::reflect) {
+    bounds[4] = DeviceAllocate<ParticleBoundIX3Reflect>();
+  } else if (bcs[4] == BoundaryFlag::outflow) {
+    bounds[4] = DeviceAllocate<ParticleBoundIX3Outflow>();
+  } else if (bcs[4] == BoundaryFlag::periodic) {
+    bounds[4] = DeviceAllocate<ParticleBoundIX3Periodic>();
+  } else if (bcs[4] != BoundaryFlag::user) {
+    msg << "ix3 boundary flag " << static_cast<int>(bcs[4]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  if (bcs[5] == BoundaryFlag::reflect) {
+    bounds[5] == DeviceAllocate<ParticleBoundOX3Reflect>();
+  } else if (bcs[5] == BoundaryFlag::outflow) {
+    bounds[5] = DeviceAllocate<ParticleBoundOX3Outflow>();
+  } else if (bcs[5] == BoundaryFlag::periodic) {
+    bounds[5] = DeviceAllocate<ParticleBoundOX3Periodic>();
+  } else if (bcs[5] != BoundaryFlag::user) {
+    msg << "ox3 boundary flag " << static_cast<int>(bcs[5]) << " not supported!";
+    PARTHENON_THROW(msg);
+  }
+
+  for (int n = 0; n < 6; n++) {
+    pbounds.bounds[n] = bounds[n].get();
+    PARTHENON_REQUIRE(pbounds.bounds[n] != nullptr,
+                      "Null device boundary condition pointer!");
+  }
+}
+
 void Swarm::Add(const std::vector<std::string> &labelArray, const Metadata &metadata) {
   // generate the vector and call Add
   for (auto label : labelArray) {
@@ -108,6 +196,7 @@ void Swarm::Add(const std::string &label, const Metadata &metadata) {
                                 " already enrolled during Add()!");
   }
 
+  int vec_type;
   if (metadata.Type() == Metadata::Integer) {
     Add_<int>(label);
   } else if (metadata.Type() == Metadata::Real) {
@@ -404,6 +493,15 @@ void Swarm::SetNeighborIndices1D_() {
   const int ndim = pmb->pmy_mesh->ndim;
   auto neighborIndices_h = neighborIndices_.GetHostMirror();
 
+  // Initialize array in event of zero neighbors
+  for (int k = 0; k < 4; k++) {
+    for (int j = 0; j < 4; j++) {
+      for (int i = 0; i < 4; i++) {
+        neighborIndices_h(k, j, i) = 0;
+      }
+    }
+  }
+
   // Indicate which neighbor regions correspond to this meshblock
   const int kmin = 0;
   const int kmax = 4;
@@ -419,6 +517,7 @@ void Swarm::SetNeighborIndices1D_() {
     }
   }
 
+  auto mesh_bcs = pmb->pmy_mesh->mesh_bcs;
   // Indicate which neighbor regions correspond to each neighbor meshblock
   for (int n = 0; n < pmb->pbval->nneighbor; n++) {
     NeighborBlock &nb = pmb->pbval->neighbor[n];
@@ -442,6 +541,15 @@ void Swarm::SetNeighborIndices2D_() {
   auto pmb = GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
   auto neighborIndices_h = neighborIndices_.GetHostMirror();
+
+  // Initialize array in event of zero neighbors
+  for (int k = 0; k < 4; k++) {
+    for (int j = 0; j < 4; j++) {
+      for (int i = 0; i < 4; i++) {
+        neighborIndices_h(k, j, i) = 0;
+      }
+    }
+  }
 
   // Indicate which neighbor regions correspond to this meshblock
   const int kmin = 0;
@@ -501,6 +609,15 @@ void Swarm::SetNeighborIndices3D_() {
   auto pmb = GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
   auto neighborIndices_h = neighborIndices_.GetHostMirror();
+
+  // Initialize array in event of zero neighbors
+  for (int k = 0; k < 4; k++) {
+    for (int j = 0; j < 4; j++) {
+      for (int i = 0; i < 4; i++) {
+        neighborIndices_h(k, j, i) = 0;
+      }
+    }
+  }
 
   // Indicate which neighbor regions correspond to this meshblock
   const int kmin = 1;
@@ -645,10 +762,10 @@ void Swarm::SetupPersistentMPI() {
   // TODO(BRR) Checks against some current limitations
   const int ndim = pmb->pmy_mesh->ndim;
   auto mesh_bcs = pmb->pmy_mesh->mesh_bcs;
-  for (int n = 0; n < 2 * ndim; n++) {
-    PARTHENON_REQUIRE(mesh_bcs[n] == BoundaryFlag::periodic,
-                      "Only periodic boundaries supported right now!");
-  }
+  // for (int n = 0; n < 2 * ndim; n++) {
+  //  PARTHENON_REQUIRE(mesh_bcs[n] == BoundaryFlag::periodic,
+  //                    "Only periodic boundaries supported right now!");
+  //}
 
   const int nbmax = pmb->pbval->nneighbor;
   num_particles_to_send_ = ParArrayND<int>("npts", nbmax);
@@ -664,6 +781,16 @@ void Swarm::SetupPersistentMPI() {
     PARTHENON_FAIL("ndim must be 1, 2, or 3 for particles!");
   }
 
+  // TODO(BRR) TEMP!
+  auto neighborIndices_h = neighborIndices_.GetHostMirror();
+  for (int k = 0; k < 4; k++) {
+    for (int j = 0; j < 4; j++) {
+      for (int i = 0; i < 4; i++) {
+        printf("[%i %i %i] neighbor: %i\n", k, j, i, neighborIndices_h(k, j, i));
+      }
+    }
+  }
+
   neighbor_received_particles_.resize(vbswarm->bd_var_.nbmax);
 }
 
@@ -672,10 +799,11 @@ int Swarm::CountParticlesToSend_() {
   auto mask_h = mask_.data.GetHostMirrorAndCopy();
   auto swarm_d = GetDeviceContext();
   auto pmb = GetBlockPointer();
+  // const int nbmax = vbswarm->bd_var_.nbmax;
+  const int nbmax = pmb->pbval->nneighbor;
 
   // Fence to make sure particles aren't currently being transported locally
   pmb->exec_space.fence();
-  const int nbmax = vbswarm->bd_var_.nbmax;
   auto num_particles_to_send_h = num_particles_to_send_.GetHostMirror();
   for (int n = 0; n < nbmax; n++) {
     num_particles_to_send_h(n) = 0;
@@ -721,7 +849,7 @@ int Swarm::CountParticlesToSend_() {
     // Resize buffer if too small
     auto sendbuf = vbswarm->bd_var_.send[n];
     if (sendbuf.extent(0) < num_particles_to_send_h(n) * particle_size) {
-      sendbuf = BufArray1D<Real>("Buffer", num_particles_to_send_h(n) * particle_size);
+      sendbuf = ParArray1D<Real>("Buffer", num_particles_to_send_h(n) * particle_size);
       vbswarm->bd_var_.send[n] = sendbuf;
     }
     vbswarm->send_size[n] = num_particles_to_send_h(n) * particle_size;
@@ -735,7 +863,7 @@ void Swarm::LoadBuffers_(const int max_indices_size) {
   auto swarm_d = GetDeviceContext();
   auto pmb = GetBlockPointer();
   const int particle_size = GetParticleDataSize();
-  const int nbmax = vbswarm->bd_var_.nbmax;
+  const int nbmax = pmb->pbval->nneighbor;
 
   auto &intVector_ = std::get<getType<int>()>(Vectors_);
   auto &realVector_ = std::get<getType<Real>()>(Vectors_);
@@ -747,6 +875,8 @@ void Swarm::LoadBuffers_(const int max_indices_size) {
   vint = PackAllVariables<int>(imap);
   int real_vars_size = realVector_.size();
   int int_vars_size = intVector_.size();
+
+  auto bcs = this->pbounds;
 
   auto &bdvar = vbswarm->bd_var_;
   auto num_particles_to_send = num_particles_to_send_;
@@ -775,14 +905,51 @@ void Swarm::LoadBuffers_(const int max_indices_size) {
 }
 
 bool Swarm::Send(BoundaryCommSubset phase) {
-  // Query particles for those to be sent
-  int max_indices_size = CountParticlesToSend_();
+  auto pmb = GetBlockPointer();
+  const int nneighbor = pmb->pbval->nneighbor;
 
-  // Prepare buffers for send operations
-  LoadBuffers_(max_indices_size);
+  if (nneighbor == 0) {
+    // Process physical boundary conditions on "sent" particles
+    auto blockIndex_h = blockIndex_.GetHostMirrorAndCopy();
+    auto mask_h = mask_.data.GetHostMirrorAndCopy();
 
-  // Send buffer data
-  vbswarm->Send(phase);
+    int total_sent_particles = 0;
+
+    int max_indices_size = 0;
+    for (int n = 0; n <= max_active_index_; n++) {
+      if (mask_h(n)) {
+        // This particle should be "sent"
+        if (blockIndex_h(n) >= 0) {
+          total_sent_particles++;
+        }
+      }
+    }
+
+    if (total_sent_particles > 0) {
+      ParArrayND<int> new_indices("new indices", total_sent_particles);
+      int sent_particle_index = 0;
+      for (int n = 0; n <= max_active_index_; n++) {
+        if (mask_h(n)) {
+          if (blockIndex_h(n) >= 0) {
+            new_indices(sent_particle_index) = n;
+            sent_particle_index++;
+          }
+        }
+      }
+
+      ApplyBoundaries_(total_sent_particles, new_indices);
+    }
+  } else {
+    // Query particles for those to be sent
+    int max_indices_size = CountParticlesToSend_();
+
+    // Prepare buffers for send operations
+    LoadBuffers_(max_indices_size);
+
+    // Send buffer data
+    vbswarm->Send(phase);
+  }
+
   return true;
 }
 
@@ -850,6 +1017,7 @@ void Swarm::UnloadBuffers_() {
     // construct map from buffer index to swarm index (or just return vector of indices!)
     const int particle_size = GetParticleDataSize();
     auto swarm_d = GetDeviceContext();
+    auto bcs = this->pbounds;
 
     pmb->par_for(
         "Unload buffers", 0, total_received_particles_ - 1, KOKKOS_LAMBDA(const int n) {
@@ -861,58 +1029,64 @@ void Swarm::UnloadBuffers_() {
           }
           for (int i = 0; i < int_vars_size; i++) {
             vint(i, sid) = static_cast<int>(
-                bdvar.recv[nid](bid * particle_size + real_vars_size + i));
-          }
-
-          double &x = vreal(ix, sid);
-          double &y = vreal(iy, sid);
-          double &z = vreal(iz, sid);
-          // TODO(BRR) Don't hardcode periodic boundary conditions
-          if (x < swarm_d.x_min_global_) {
-            x = swarm_d.x_max_global_ - (swarm_d.x_min_global_ - x);
-          }
-          if (x > swarm_d.x_max_global_) {
-            x = swarm_d.x_min_global_ + (x - swarm_d.x_max_global_);
-          }
-          if (y < swarm_d.y_min_global_) {
-            y = swarm_d.y_max_global_ - (swarm_d.y_min_global_ - y);
-          }
-          if (y > swarm_d.y_max_global_) {
-            y = swarm_d.y_min_global_ + (y - swarm_d.y_max_global_);
-          }
-          if (z < swarm_d.z_min_global_) {
-            z = swarm_d.z_max_global_ - (swarm_d.z_min_global_ - z);
-          }
-          if (z > swarm_d.z_max_global_) {
-            z = swarm_d.z_min_global_ + (z - swarm_d.z_max_global_);
+                bdvar.recv[nid](real_vars_size + bid * particle_size + i));
           }
         });
+
+    ApplyBoundaries_(total_received_particles_, new_indices);
   }
 }
 
-bool Swarm::Receive(BoundaryCommSubset phase) {
-  // Ensure all local deep copies marked BoundaryStatus::completed are actually received
-  GetBlockPointer()->exec_space.fence();
+void Swarm::ApplyBoundaries_(const int nparticles, ParArrayND<int> indices) {
   auto pmb = GetBlockPointer();
+  auto &x = Get<Real>("x").Get();
+  auto &y = Get<Real>("y").Get();
+  auto &z = Get<Real>("z").Get();
+  auto swarm_d = GetDeviceContext();
+  auto bcs = this->pbounds;
 
-  // Populate buffers
-  vbswarm->Receive(phase);
+  pmb->par_for(
+      "Swarm::ApplyBoundaries", 0, nparticles - 1, KOKKOS_LAMBDA(const int n) {
+        const int sid = indices(n);
+        for (int l = 0; l < 6; l++) {
+          bcs.bounds[l]->Apply(sid, x(sid), y(sid), z(sid), swarm_d);
+        }
+      });
 
-  // Transfer data from buffers to swarm memory pool
-  UnloadBuffers_();
+  RemoveMarkedParticles();
+}
 
-  auto &bdvar = vbswarm->bd_var_;
-  bool all_boundaries_received = true;
-  for (int n = 0; n < pmb->pbval->nneighbor; n++) {
-    NeighborBlock &nb = pmb->pbval->neighbor[n];
-    if (bdvar.flag[nb.bufid] == BoundaryStatus::arrived) {
-      bdvar.flag[nb.bufid] = BoundaryStatus::completed;
-    } else if (bdvar.flag[nb.bufid] == BoundaryStatus::waiting) {
-      all_boundaries_received = false;
+bool Swarm::Receive(BoundaryCommSubset phase) {
+  auto pmb = GetBlockPointer();
+  const int nneighbor = pmb->pbval->nneighbor;
+
+  if (nneighbor == 0) {
+    // Do nothing; no boundaries to receive
+    return true;
+  } else {
+    // Ensure all local deep copies marked BoundaryStatus::completed are actually received
+    GetBlockPointer()->exec_space.fence();
+    auto pmb = GetBlockPointer();
+
+    // Populate buffers
+    vbswarm->Receive(phase);
+
+    // Transfer data from buffers to swarm memory pool
+    UnloadBuffers_();
+
+    auto &bdvar = vbswarm->bd_var_;
+    bool all_boundaries_received = true;
+    for (int n = 0; n < pmb->pbval->nneighbor; n++) {
+      NeighborBlock &nb = pmb->pbval->neighbor[n];
+      if (bdvar.flag[nb.bufid] == BoundaryStatus::arrived) {
+        bdvar.flag[nb.bufid] = BoundaryStatus::completed;
+      } else if (bdvar.flag[nb.bufid] == BoundaryStatus::waiting) {
+        all_boundaries_received = false;
+      }
     }
-  }
 
-  return all_boundaries_received;
+    return all_boundaries_received;
+  }
 }
 
 void Swarm::AllocateComms(std::weak_ptr<MeshBlock> wpmb) {

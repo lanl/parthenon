@@ -343,6 +343,7 @@ TaskStatus TransportParticles(MeshBlock *pmb, const StagedIntegrator *integrator
 
   Real dt = integrator->dt;
 
+  auto &id = swarm->Get<int>("id").Get();
   auto &x = swarm->Get<Real>("x").Get();
   auto &y = swarm->Get<Real>("y").Get();
   auto &z = swarm->Get<Real>("z").Get();
