@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2020-2021. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -38,12 +38,21 @@ class Mesh;
 template <typename T>
 class MeshBlockPack {
  public:
+  using pack_type = T;
+
   MeshBlockPack() = default;
   MeshBlockPack(const ParArray1D<T> view, const IndexShape shape,
                 const ParArray1D<Coordinates_t> coordinates,
-                const std::array<int, 5> dims)
+                const std::array<int, 5> dims,
+                const Kokkos::View<bool *, HostMemSpace> &allocation_status_collection)
       : v_(view), cellbounds(shape), coords(coordinates), dims_(dims),
-        ndim_((dims[2] > 1 ? 3 : (dims[1] > 1 ? 2 : 1))) {}
+        ndim_((dims[2] > 1 ? 3 : (dims[1] > 1 ? 2 : 1))),
+        allocation_status_collection_(allocation_status_collection) {}
+  // host only
+  const auto &allocation_status_collection() const {
+    return allocation_status_collection_;
+  }
+
   KOKKOS_FORCEINLINE_FUNCTION
   auto &operator()(const int block) const { return v_(block); }
   KOKKOS_FORCEINLINE_FUNCTION
@@ -53,6 +62,12 @@ class MeshBlockPack {
                    const int i) const {
     return v_(block)(n)(k, j, i);
   }
+
+  KOKKOS_FORCEINLINE_FUNCTION bool IsSparseIDAllocated(const int block,
+                                                       const int var) const {
+    return v_(block).GetDim(4) > var && v_(block)(var).is_allocated();
+  }
+
   KOKKOS_FORCEINLINE_FUNCTION
   int GetDim(const int i) const {
     assert(i > 0 && i < 6);
@@ -69,6 +84,7 @@ class MeshBlockPack {
 
  private:
   ParArray1D<T> v_;
+  Kokkos::View<bool *, HostMemSpace> allocation_status_collection_; // host only
   std::array<int, 5> dims_;
   int ndim_;
 };
@@ -86,11 +102,10 @@ using MeshBlockVarFluxPack = MeshBlockPack<VariableFluxPack<T>>;
 template <typename T>
 using MeshPackIndxPair = PackAndIndexMap<MeshBlockPack<T>>;
 template <typename T>
-using MapToMeshBlockVarPack =
-    std::map<std::vector<std::string>, MeshBlockPack<VariablePack<T>>>;
+using MapToMeshBlockVarPack = std::map<std::vector<std::string>, MeshBlockVarPack<T>>;
 template <typename T>
 using MapToMeshBlockVarFluxPack =
-    std::map<vpack_types::StringPair, MeshBlockPack<VariableFluxPack<T>>>;
+    std::map<vpack_types::StringPair, MeshBlockVarFluxPack<T>>;
 
 } // namespace parthenon
 
